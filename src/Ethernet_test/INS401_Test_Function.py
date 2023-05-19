@@ -45,7 +45,7 @@ class Test_Scripts:
     def get_production_info(self):
         message_bytes = []
         command = INPUT_PACKETS[0]
-        response = self.uut.write_read_response(command, message_bytes, 0.5)
+        response = self.uut.write_read_response(command, message_bytes, 1)
         except_info_dict = self.properties["productINFO"]
         info_text = response[2].decode().split(' ')
         actual_info_dict = {
@@ -79,7 +79,7 @@ class Test_Scripts:
         expect_separator = ' '
         message_bytes = []
         command = INPUT_PACKETS[0]
-        response = self.uut.write_read_response(command, message_bytes, 0.5)
+        response = self.uut.write_read_response(command, message_bytes, 1)
         try:
             info_text = response[2].decode()
         except:
@@ -99,12 +99,12 @@ class Test_Scripts:
             field_id_bytes = struct.pack('<I', field_id)
             message_bytes.extend(field_id_bytes)
 
-            response = self.uut.write_read_response(command, message_bytes, 0.1)
+            response = self.uut.write_read_response(command, message_bytes, 1)
  
         if response[0] == command:
             return True, f'{response[0].hex()}', f'{command.hex()}'
         else:
-            return True, f'{response[0].hex()}', f'{command.hex()}'
+            return False, f'{response[0]}', f'{command.hex()}'
                 
     def set_user_configuration(self):
         command = INPUT_PACKETS[2]
@@ -123,25 +123,25 @@ class Test_Scripts:
         if response[0] == command:
             return True, f'{response[0].hex()}', f'{command.hex()}'
         else:
-            return True, f'{response[0].hex()}', f'{command.hex()}'  
+            return False, f'{response[0]}', f'{command.hex()}'  
  
     def save_user_configuration(self):
         command = INPUT_PACKETS[3]
         message_bytes = []
 
-        response = self.uut.write_read_response(command, message_bytes, 0.5)
+        response = self.uut.write_read_response(command, message_bytes, 1)
 
         if response[0] == command:
             return True, f'{response[0].hex()}', f'{command.hex()}'
         else:
-            return True, f'{response[0].hex()}', f'{command.hex()}'  
+            return False, f'{response[0]}', f'{command.hex()}'  
             
     def send_system_reset_command(self):
         reset_command = INPUT_PACKETS[5]
         ping_command = INPUT_PACKETS[0]
         message_bytes = []
 
-        reset_response = self.uut.write_read_response(reset_command, message_bytes, 0.1)
+        reset_response = self.uut.write_read_response(reset_command, message_bytes, 1)
         if reset_response[0] == reset_command:
             is_get_reset_response = True
         else:
@@ -149,7 +149,7 @@ class Test_Scripts:
         time.sleep(30)
         self.eth.find_device()
         self.eth.ping_device()
-        ping_response = self.eth.write_read_response(ping_command, message_bytes, 0.1)
+        ping_response = self.eth.write_read_response(ping_command, message_bytes, 1)
         if ping_response[0] == ping_command:
             is_get_ping_response = True
         else:
@@ -164,7 +164,7 @@ class Test_Scripts:
         command = INPUT_PACKETS[9]
         message_bytes = []
 
-        response = self.uut.write_read_response(command, message_bytes, 0.1)[2].decode()
+        response = self.uut.write_read_response(command, message_bytes, 1)[2].decode()
         algo_version_lst = response.split(',')
         ins_algo_ver = algo_version_lst[0].split(' ')[0]
         rtk_algo_ver = algo_version_lst[1].split(' ')[1]
