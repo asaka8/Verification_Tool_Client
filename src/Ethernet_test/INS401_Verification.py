@@ -137,7 +137,7 @@ class Verification:
         if not os.path.exists('./result'):
             os.mkdir('./result')
         file_name = f'./result/test_results_{str(serial_number)}_{str(version)}.xlsx'
-        env.log_results(file_name)
+        env.log_results(file_name, mode='static')
 
     def dynamic_test(self, text_browser, data_path, result_file_path):
         env = Test_Environment()
@@ -151,4 +151,4 @@ class Verification:
         if not os.path.exists('./result'):
             os.mkdir('./result')
         file_name = result_file_path
-        env.log_results(file_name)
+        env.log_results(file_name, mode='dynamic')

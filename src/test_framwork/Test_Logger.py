@@ -65,8 +65,11 @@ class TestLogger:
             logf.close()
 
 class xlsx_factory: 
-    def __init__(self, file_name) -> None:
-        self.wb = load_workbook(file_name)
+    def __init__(self, file_name, mode='static') -> None:
+        if mode == 'static':
+            self.wb = load_workbook('./case/INS401_ETHERNET_INTERFACE_FUNCTION_TEST_CASE_v3.0.xlsx')
+        elif mode == 'dynamic':
+            self.wb = load_workbook(file_name)
         self.ws = self.wb.active
         self.ts0 = self.wb.worksheets[0]
         self.ts1 = self.wb.worksheets[1]

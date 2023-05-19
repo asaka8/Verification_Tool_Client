@@ -261,8 +261,8 @@ class Test_Environment:
                 result_str = result + id + " " + test.test_case_name + " Expected: "+ test.result['expected'] + " Actual: "+  test.result['actual'] + "\r\n"
                 print(result_str)
 
-    def log_results(self, file_name):
-        xf = xlsx_factory(file_name)
+    def log_results(self, file_name, mode):
+        xf = xlsx_factory(file_name, mode)
         test_case_sheet = xf.sheet_ready()
         test_actual_val_column = test_case_sheet[0]
         test_result_column = test_case_sheet[1]
