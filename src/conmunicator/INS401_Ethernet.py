@@ -33,6 +33,7 @@ class Ethernet_Dev:
         self.model_string = None
         self.app_version = None
         self.receive_cache = collections.deque(maxlen=10000)
+        self.async_sniffer = None
 
     def reset_dev_info(self):
         self.app_version = None
@@ -50,14 +51,14 @@ class Ethernet_Dev:
         src_mac = bytes([int(x, 16) for x in self.src_mac.split(':')])
         command_line = self.build_packet(
             self.get_dst_mac(), src_mac, PING_TYPE)
-        async_sniffer = AsyncSniffer(
+        self.async_sniffer = AsyncSniffer(
             iface=self.iface, prn=self.handle_receive_packet, filter=filter_exp)
         global_var.set_value('AsyncSnifferEnable', True)
-        async_sniffer.start()
+        self.async_sniffer.start()
         time.sleep(0.1)
         sendp(command_line, self.iface, verbose=0)
         Timer('AsyncSnifferEnable', 1)
-        async_sniffer.stop()
+        self.sniffer_nemesis()
 
         if self.iface_confirmed:            
             # print('Successful connection')
@@ -143,7 +144,7 @@ class Ethernet_Dev:
         time.sleep(0.1)
 
     def stop_listen_data(self):
-        self.async_sniffer.stop()
+        self.sniffer_nemesis()
 
     def check_len(self):
         return len(self.receive_cache)
@@ -158,7 +159,15 @@ class Ethernet_Dev:
     def handle_receive_read_result(self, packet):
         self.read_result = bytes(packet)
 
-    def write_read(self, data, filter_cmd_type=0, timeout = 0.1):
+    def sniffer_nemesis(self):
+        if self.async_sniffer is None:
+            return
+        if self.async_sniffer.running == True:
+            self.async_sniffer.stop()
+        else:
+            return
+
+    def write_read(self, data, filter_cmd_type=0, timeout=0.5): 
         if not self.src_mac:
             return None
     
@@ -169,15 +178,15 @@ class Ethernet_Dev:
             filter_exp = 'ether dst host ' + self.src_mac
 
         self.read_result = None
-        async_sniffer = AsyncSniffer(
+        self.async_sniffer = AsyncSniffer(
             iface=self.iface, prn=self.handle_receive_read_result, filter=filter_exp, store=0)
 
-        async_sniffer.start()
+        self.async_sniffer.start()
         self.reset_buffer()
         time.sleep(0.1)
         sendp(data, iface=self.iface, verbose=0)
         time.sleep(timeout)
-        async_sniffer.stop()
+        self.sniffer_nemesis()
         if self.read_result is not None:
             return self.read_result
         return None
@@ -211,9 +220,9 @@ class Ethernet_Dev:
             filter_exp = 'ether dst host ' + self.src_mac
         
         self.receive_packet_count = 0
-        async_sniffer = AsyncSniffer(
+        self.async_sniffer = AsyncSniffer(
             iface=self.iface, prn=self.handle_async_receive_read_result, filter=filter_exp, store=0)
-        async_sniffer.start()
+        self.async_sniffer.start()
         
         time.sleep(1)
         print('Long term Test start time at :[{0}]'.format(
@@ -230,7 +239,7 @@ class Ethernet_Dev:
         time.sleep(5)
         print('Long term Test end time at :[{0}]'.format(
                 datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-        async_sniffer.stop()
+        self.sniffer_nemesis()
         
         print(self.receive_packet_count, count)
         if self.receive_packet_count == count:

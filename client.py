@@ -203,7 +203,7 @@ class StaticDialog(QDialog):
         # self.static_test_thread = thread(target=ver.static_test, name='StaticThread', args=(self.static_ui.textBrowser, ))
         self.static_test_thread = StaticTestStart(self.static_ui.textBrowser)
         self.check_thread = thread(target=self.thread_check, name='CheckThread')
-        self.static_test_thread.start()
+        self.static_test_thread.start(timeout=1)
         self.check_thread.start()
         self.static_ui.runButton.setEnabled(False)
         self.static_ui.settingButton.setEnabled(False)
