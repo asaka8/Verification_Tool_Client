@@ -7,20 +7,29 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>363</height>
+    <height>378</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
     <width>400</width>
-    <height>363</height>
+    <height>378</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>400</width>
-    <height>363</height>
+    <height>378</height>
    </size>
+  </property>
+  <property name="font">
+   <font>
+    <family>Yu Gothic UI Light</family>
+    <pointsize>10</pointsize>
+   </font>
+  </property>
+  <property name="acceptDrops">
+   <bool>true</bool>
   </property>
   <property name="windowTitle">
    <string>Test</string>
@@ -77,13 +86,16 @@
          </attribute>
         </widget>
        </item>
-       <item alignment="Qt::AlignLeft">
+       <item>
         <widget class="QRadioButton" name="DynamicRdoButton">
          <property name="font">
           <font>
            <family>Yu Gothic UI</family>
            <pointsize>10</pointsize>
           </font>
+         </property>
+         <property name="acceptDrops">
+          <bool>true</bool>
          </property>
          <property name="text">
           <string>Dynamic Test</string>
@@ -121,6 +133,58 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="DebugModeLayout">
+       <item alignment="Qt::AlignLeft">
+        <widget class="QLabel" name="DebugLabel">
+         <property name="font">
+          <font>
+           <family>Yu Gothic UI</family>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="text">
+          <string>Debug Mode</string>
+         </property>
+        </widget>
+       </item>
+       <item alignment="Qt::AlignLeft">
+        <widget class="QComboBox" name="DebugModeComboBox">
+         <property name="minimumSize">
+          <size>
+           <width>180</width>
+           <height>21</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>180</width>
+           <height>21</height>
+          </size>
+         </property>
+         <property name="font">
+          <font>
+           <family>Yu Gothic UI</family>
+           <pointsize>10</pointsize>
+          </font>
+         </property>
+         <property name="currentIndex">
+          <number>-1</number>
+         </property>
+         <item>
+          <property name="text">
+           <string>Static</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Dynamic</string>
+          </property>
+         </item>
         </widget>
        </item>
       </layout>
@@ -255,11 +319,14 @@
          <property name="dragEnabled">
           <bool>true</bool>
          </property>
+         <property name="readOnly">
+          <bool>false</bool>
+         </property>
          <property name="placeholderText">
           <string>Please input the path of test data</string>
          </property>
          <property name="clearButtonEnabled">
-          <bool>false</bool>
+          <bool>true</bool>
          </property>
         </widget>
        </item>
@@ -307,8 +374,14 @@
          <property name="dragEnabled">
           <bool>true</bool>
          </property>
+         <property name="readOnly">
+          <bool>false</bool>
+         </property>
          <property name="placeholderText">
           <string>Please input the path of result output</string>
+         </property>
+         <property name="clearButtonEnabled">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
