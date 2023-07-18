@@ -8,9 +8,25 @@ from ..test_framwork.Jsonf_Creater import Setting_Json_Creat
 from .print_center import pass_print, error_print
 
 class NtripClient:
+    '''
+    Parameters:
+        callback: ntrip receive callback function (type: function; example: ntrip_receive_callback)
+    '''
     def __init__(self, callback):
+        '''
+        is_connected: the flag indicating whether ntrip is connected (default: 0->False) 
+        tcp_client_socket: a socket to do tcp communication (default: None)
+        is_close: control ntrip thread (default: False)
+        append_header_string: header string (default: None)
+        callback: callback function (default: callback)
 
-        self.is_connected = 0
+        ip: ip address (default: get from setting jsonf)
+        port: port name (default: get from setting jsonf)
+        mountPoint: mount point name (default: get from setting jsonf)
+        username: username (default: get from setting jsonf)
+        password: password (default: get from setting jsonf)
+        '''
+        self.is_connected = 0 # 1 -> True
         self.tcp_client_socket = None
         self.is_close = False
         self.append_header_string= None
@@ -130,7 +146,18 @@ class NtripClient:
         self.is_close = True
 
 class RuNtrip:
+    '''
+    Parameters:
+        eth: ethernet device class (type: class)
+    '''
     def __init__(self, eth):
+        '''
+        local_time: the time of RuNtrip class initialization (default: time.localtime())
+        formatted_time: transfor local time to the user format (default: "%Y_%m_%d_%H_%M_%S")
+        ether: ethernet device class (default: eth)
+        ntrip: NtripClient 
+        ntrip_rtcm_logf: the file to log base rtcm data (default: None)
+        '''
         path = os.getcwd()
         self.local_time = time.localtime()
         self.formatted_file_time = time.strftime("%Y_%m_%d_%H_%M_%S", self.local_time)
@@ -139,9 +166,6 @@ class RuNtrip:
         self.ntrip = NtripClient(self.ntrip_receive_callback)
         self.ntrip_rtcm_logf = None 
 
-    '''
-    ntrip
-    '''
     def ntrip_client_thread(self, wait_time=0):
         data_dir = './data'
         if not os.path.exists(data_dir):
