@@ -1,19 +1,25 @@
 import sys
 import time
-import module.global_var as global_var
+import threading
+import concurrent.futures
 
-from PySide2.QtWidgets import QDialog, QMainWindow, QMessageBox, QFileDialog
+from PySide2.QtWidgets import QDialog, QMainWindow, QMessageBox, QFileDialog, QApplication, QWidget, QTreeWidget, \
+    QVBoxLayout, QTreeWidgetItem, QPushButton, QHBoxLayout, QVBoxLayout, QTreeWidgetItemIterator
 from PySide2.QtUiTools import QUiLoader
-from PySide2.QtCore import QFile, QThread, Signal
+from PySide2.QtCore import QFile, QThread, QMimeData, Signal, Qt
+from PySide2.QtGui import QFont, QIcon, QDrag
 
-from src.conmunicator.INS401_Ethernet import Ethernet_Dev
-from src.Ethernet_test.INS401_Verification import Verification
-from src.test_framwork.Jsonf_Creater import Setting_Json_Creat
+# from .debug_ui import StaticDebugSettingWidget, DynamicDebugSettingWidget
+
+from ..conmunicator.INS401_Ethernet import Ethernet_Dev
+from ..Ethernet_test.INS401_Verification import Verification
+from ..test_framwork.Jsonf_Creater import Setting_Json_Creat
+from ..Ethernet_test.INS401_Test_Center import Test_Environment
 
 from module.myThread import MyThread as thread
 from module.myUiLoader import myUiLoader as UiLoader
+import module.global_var as global_var
 
- 
 class SettingDialog(QDialog):
     def __init__(self, mode=None):
         super(SettingDialog, self).__init__()
@@ -68,6 +74,10 @@ class SettingDialog(QDialog):
             self.setting_ui.DynamicPosComboBox.setEnabled(False)
         elif mode != 'static':
             self.setting_ui.StaticPosComboBox.setEnabled(False)
+        
+        # add icon
+        icon = QIcon("./aceinna.ico")
+        self.setting_ui.setWindowIcon(icon)
 
     def save_setting(self):
         json = Setting_Json_Creat()
@@ -169,8 +179,10 @@ class SettingDialog(QDialog):
             self.check_ntrip_enable_thread.stop()
 
 class StaticDialog(QDialog):
-    def __init__(self):
+    def __init__(self, debug=False, test_dict=None):
         super(StaticDialog, self).__init__()
+        self.debug = debug
+        self.test_dict = test_dict
         # load static dialog ui file
         static_qfile = QFile('ui/static_test_dialog.ui')
         static_qfile.open(QFile.ReadOnly)
@@ -193,18 +205,24 @@ class StaticDialog(QDialog):
 
         # thread initialization
         self.static_test_thread = None
+        self.thread_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
+        # add icon
+        icon = QIcon("./aceinna.ico")
+        self.static_ui.setWindowIcon(icon)
 
     # --------------------------------------------------------------------------------------------
     # Static test function
     def start_test(self):
-        # ver = Verification()
+        ver = Verification()
         self.static_ui.progressBar.show()
         
         # self.static_test_thread = thread(target=ver.static_test, name='StaticThread', args=(self.static_ui.textBrowser, ))
-        self.static_test_thread = StaticTestStart(self.static_ui.textBrowser)
-        self.check_thread = thread(target=self.thread_check, name='CheckThread')
-        self.static_test_thread.start(timeout=1)
-        self.check_thread.start()
+        # self.static_test_thread = StaticTestStart(self.static_ui.textBrowser, self.debug, self.test_dict)
+        self.thread_executor.submit(ver.static_test, self.static_ui.textBrowser, self.debug, self.test_dict)
+        # self.check_thread = thread(target=self.thread_check, name='CheckThread')
+        # self.static_test_thread.start(timeout=1)
+        # self.check_thread.start()
         self.static_ui.runButton.setEnabled(False)
         self.static_ui.settingButton.setEnabled(False)
         self.static_ui.clearButton.setEnabled(False)
@@ -279,8 +297,10 @@ class StaticDialog(QDialog):
 
 
 class DynamicDialog(QDialog):
-    def __init__(self, data_path, result_file_path):
+    def __init__(self, data_path, result_file_path, debug=False, test_dict=None):
         super(DynamicDialog, self).__init__()
+        self.debug = debug
+        self.test_dict = test_dict
         # dynamic dialog initialization
         self.data_path = data_path
         self.result_file_path = result_file_path
@@ -303,12 +323,16 @@ class DynamicDialog(QDialog):
         # thread initialization
         self.dynamic_test_thread = None
 
+        # add icon
+        icon = QIcon("./aceinna.ico")
+        self.dynamic_ui.setWindowIcon(icon)
+
     def start_test(self):
         # ver = Verification()
         self.dynamic_ui.progressBar.show()
         
         # self.static_test_thread = thread(target=ver.static_test, name='StaticThread', args=(self.static_ui.textBrowser, ))
-        self.dynamic_test_thread = DynamicTestStart(self.dynamic_ui.textBrowser, self.data_path, self.result_file_path)
+        self.dynamic_test_thread = DynamicTestStart(self.dynamic_ui.textBrowser, self.data_path, self.result_file_path, self.debug, self.test_dict)
         self.check_thread = thread(target=self.thread_check, name='CheckThread')
         self.dynamic_test_thread.start()
         self.check_thread.start()
@@ -385,16 +409,6 @@ class DynamicDialog(QDialog):
             else:
                 event.ignore()
 
-class DebugDialog(QDialog):
-    def __init__(self):
-        super().__init__()
-        # debug dialog initialization
-        debug_qfile = QFile('ui/debug_test_dialog.ui')
-        debug_qfile.open(QFile.ReadOnly)
-        debug_qfile.close()
-        
-        self.debug_ui = QUiLoader().load(debug_qfile, self)
-
 class MainWidget(QMainWindow):
     def __init__ (self):
         super().__init__()
@@ -410,8 +424,16 @@ class MainWidget(QMainWindow):
         self.main_ui.ModeButtonGroup.buttonClicked.connect(self.handle_button_click)
         self.main_ui.toolButton_1.clicked.connect(self.handle_select_data_path)
         self.main_ui.toolButton_2.clicked.connect(self.handle_select_result_file_path)
-        self.main_ui.DebugRdoButton.setEnabled(False)
+        # self.main_ui.DebugRdoButton.setEnabled(False)
         self.assign_network_card()
+
+        self.main_ui.DebugModeComboBox.setEnabled(False)
+        self.main_ui.NetworkCardComboBox.setEnabled(False)
+        self.main_ui.LocalMacComboBox.setEnabled(False)
+        self.main_ui.DataPathLineEdit.setEnabled(False)
+        self.main_ui.ResFileLineEdit.setEnabled(False)
+        self.main_ui.toolButton_1.setEnabled(False)
+        self.main_ui.toolButton_2.setEnabled(False)
 
         # test mode parameter initialization
         self.static_test_act = False
@@ -421,6 +443,16 @@ class MainWidget(QMainWindow):
         # Enviroment initialization
         global_var._init()
         self.network_card_list = []
+        self.data_path = None
+
+        # thread initialization
+        self.thread_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+        self.inDynamic = False
+        self.inDebug = False
+
+        # add icon
+        icon = QIcon("./aceinna.ico")
+        self.main_ui.setWindowIcon(icon)
 
     #----------------------------------------------------------------
 
@@ -442,7 +474,11 @@ class MainWidget(QMainWindow):
             self.static_test_act = True
             self.dynamic_test_act = False
             self.debug_test_act = False
+            self.inDebug = False
+            self.inDynamic = False
+            time.sleep(0.1) # the time to wait for Reset control state
 
+            self.main_ui.DebugModeComboBox.setEnabled(False)
             self.main_ui.NetworkCardComboBox.setEnabled(True)
             self.main_ui.LocalMacComboBox.setEnabled(True)
 
@@ -455,7 +491,11 @@ class MainWidget(QMainWindow):
             self.dynamic_test_act = True
             self.static_test_act = False
             self.debug_test_act = False
+            self.inDebug = False
+            self.inDynamic = True
+            time.sleep(0.1) # the time to wait for Reset control state
 
+            self.main_ui.DebugModeComboBox.setEnabled(False)
             self.main_ui.NetworkCardComboBox.setEnabled(False)
             self.main_ui.LocalMacComboBox.setEnabled(False)
 
@@ -464,21 +504,40 @@ class MainWidget(QMainWindow):
             self.main_ui.toolButton_1.setEnabled(True)
             self.main_ui.toolButton_2.setEnabled(True)
 
+            self.thread_executor.submit(self.check_input_path)
+
         elif mode_val == 'Debug Test':
             self.debug_test_act = True
             self.static_test_act = False
             self.dynamic_test_act = False
+            self.inDebug = True
+            self.inDynamic = False
+            time.sleep(0.1) # the time to wait for Reset control state
+
+            self.main_ui.DebugModeComboBox.setEnabled(True)
+            self.main_ui.NetworkCardComboBox.setEnabled(False)
+            self.main_ui.LocalMacComboBox.setEnabled(False)
+
+            self.main_ui.DataPathLineEdit.setEnabled(False)
+            self.main_ui.ResFileLineEdit.setEnabled(False)
+            self.main_ui.toolButton_1.setEnabled(False)
+            self.main_ui.toolButton_2.setEnabled(False)
+
+            self.thread_executor.submit(self.check_debug_mode)
 
     def handle_mode_chosed(self):
+        self.inDynamic = False
+        self.inDebug = False
         if self.static_test_act == True:
-            self.open_static_test_dialog()
             self.static_test_act = False
-        if self.dynamic_test_act == True:
-            self.open_dynamic_test_dialog()
+            self.open_static_test_dialog()
+        elif self.dynamic_test_act == True:
             self.dynamic_test_act = False
-        if self.debug_test_act == True:
-            self.open_debug_test_dialog()
+            self.open_dynamic_test_dialog()
+        elif self.debug_test_act == True:
             self.debug_test_act = False
+            # self.open_debug_test_dialog()
+            self.open_debug_setting_dialog()
 
     def assign_network_card(self):
         self.eth = Ethernet_Dev()
@@ -488,7 +547,6 @@ class MainWidget(QMainWindow):
             self.main_ui.LocalMacComboBox.addItem(card[1])
             
     #----------------------------------------------------------------  
-
     def open_static_test_dialog(self):
         global_var.set_value('iface', self.main_ui.NetworkCardComboBox.currentText())
         global_var.set_value('src mac', self.main_ui.LocalMacComboBox.currentText())
@@ -499,10 +557,250 @@ class MainWidget(QMainWindow):
         self.dynamicD = DynamicDialog(self.data_path, self.result_file_path)
         self.dynamicD.show()
 
-    def open_debug_test_dialog(self):
-        self.debugD = DebugDialog()
-        self.debugD.debug_ui.show()
+    def open_debug_setting_dialog(self):
+        if self.main_ui.DebugModeComboBox.currentText() == 'Static':
+            global_var.set_value('iface', self.main_ui.NetworkCardComboBox.currentText())
+            global_var.set_value('src mac', self.main_ui.LocalMacComboBox.currentText())
+            self.static_debug_setting_dialog = StaticDebugSettingWidget()
+            self.static_debug_setting_dialog.show()
+        elif self.main_ui.DebugModeComboBox.currentText() == 'Dynamic':
+            if self.data_path == None:
+                self.data_path = self.main_ui.DataPathLineEdit.text()
+                self.dynamic_debug_setting_dialog = DynamicDebugSettingWidget(self.data_path, self.result_file_path)
+            else:
+                self.dynamic_debug_setting_dialog = DynamicDebugSettingWidget(self.data_path, self.result_file_path)
+            self.inDynamic = False
+            self.dynamic_debug_setting_dialog.show()
+        
+    #----------------------------------------------------------------
+    def check_debug_mode(self):
+        while self.inDebug == True:
+            if self.main_ui.DebugModeComboBox.isEnabled() == False:
+                continue
+            
+            if self.main_ui.DebugModeComboBox.currentText() == 'Static':
+                self.inDynamic = False
+                self.main_ui.NetworkCardComboBox.setEnabled(True)
+                self.main_ui.LocalMacComboBox.setEnabled(True)
 
+                self.main_ui.DataPathLineEdit.setEnabled(False)
+                self.main_ui.ResFileLineEdit.setEnabled(False)
+                self.main_ui.toolButton_1.setEnabled(False)
+                self.main_ui.toolButton_2.setEnabled(False)
+                
+            elif self.main_ui.DebugModeComboBox.currentText() == 'Dynamic':
+                self.inDynamic = True
+                self.main_ui.NetworkCardComboBox.setEnabled(False)
+                self.main_ui.LocalMacComboBox.setEnabled(False)
+
+                self.main_ui.DataPathLineEdit.setEnabled(True)
+                self.main_ui.ResFileLineEdit.setEnabled(True)
+                self.main_ui.toolButton_1.setEnabled(True)
+                self.main_ui.toolButton_2.setEnabled(True)
+
+                self.thread_executor.submit(self.check_input_path)
+
+    def check_input_path(self):
+        while self.inDynamic:
+            if self.main_ui.DataPathLineEdit.text() == '' or self.main_ui.ResFileLineEdit.text() == '':
+                self.main_ui.RunButton.setEnabled(False)
+            else:
+                self.main_ui.RunButton.setEnabled(True)
+        self.main_ui.RunButton.setEnabled(True)
+
+#-----------------------------------------------------------------
+# debug functions
+class StaticDebugSettingWidget(QWidget):
+    def __init__(self):
+        super(StaticDebugSettingWidget, self).__init__()
+
+        self.tree_widget = QTreeWidget()
+        self.tree_widget.setHeaderLabels(['Test Cases'])
+        self.resize(600, 400)
+        self.setWindowTitle("Select test cases")
+
+        sections = self.get_debug_sections()
+
+        # add checkboxes tree widget
+        for section, cases in sections.items():
+            parent_item = QTreeWidgetItem(self.tree_widget)
+            parent_item.setText(0, section)
+            parent_item.setFlags(parent_item.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
+
+            for case_name in cases:
+                child_item = QTreeWidgetItem(parent_item)
+                child_item.setText(0, case_name)
+                child_item.setFlags(child_item.flags() | Qt.ItemIsUserCheckable)
+                child_item.setCheckState(0, Qt.Unchecked)
+
+        self.treelayout = QVBoxLayout()
+        self.treelayout.addWidget(self.tree_widget)
+
+        self.buttonlayout = QHBoxLayout()
+        self.reset_button = QPushButton('Reset', self)
+        self.confirm_button = QPushButton('OK', self)
+        self.cancel_button = QPushButton('Cancel', self)
+
+        font = QFont("Yu Gothic UI", 9)
+        self.reset_button.setFont(font)
+        self.confirm_button.setFont(font)
+        self.cancel_button.setFont(font)
+
+        self.reset_button.clicked.connect(self.reset)
+        self.confirm_button.clicked.connect(self.confirm)
+        self.cancel_button.clicked.connect(self.cancel)
+
+        self.buttonlayout.addWidget(self.reset_button)
+        self.buttonlayout.addWidget(self.confirm_button)
+        self.buttonlayout.addWidget(self.cancel_button)
+
+        self.mainlayout = QVBoxLayout()
+        self.mainlayout.addLayout(self.treelayout)
+        self.mainlayout.addLayout(self.buttonlayout)
+        self.setLayout(self.mainlayout)
+
+        # add icon
+        icon = QIcon("./aceinna.ico")
+        self.setWindowIcon(icon)
+
+    def get_debug_sections(self):
+        env = Test_Environment()
+        env.setup_static_tests()
+
+        sections = {}
+        for section in env.test_sections:
+            cases = []
+            for case in section.test_cases:
+                cases.append(case.test_case_name)
+            sections[f'{section.section_name}'] = cases
+
+        return sections
+
+    def reset(self):
+        iterator = QTreeWidgetItemIterator(self.tree_widget, QTreeWidgetItemIterator.All)
+        while iterator.value():
+            item = iterator.value()
+            item.setCheckState(0, Qt.CheckState.Unchecked)
+            iterator += 1
+
+    def confirm(self):
+        sections = {}
+        for i in range(self.tree_widget.topLevelItemCount()):
+            top_level_item = self.tree_widget.topLevelItem(i)
+            cases = []
+            for j in range(top_level_item.childCount()):
+                child_item = top_level_item.child(j)
+                if child_item.checkState(0) == Qt.Checked:
+                    cases.append(child_item.text(0))
+            if len(cases) != 0:
+                sections[top_level_item.text(0)] = cases
+        self.sections = sections
+        # print(self.sections)
+        # self.close()
+        self.open_static_test_dialog(True, self.sections)
+
+    def open_static_test_dialog(self, debug, test_dict):
+        self.staticD = StaticDialog(debug, test_dict)
+        self.staticD.show()
+
+    def cancel(self):
+        self.close()
+        
+class DynamicDebugSettingWidget(QWidget):
+    def __init__(self, data_path, result_file_path):
+        super(DynamicDebugSettingWidget, self).__init__()
+
+        self.data_path = data_path
+        self.result_file_path = result_file_path
+        self.tree_widget = QTreeWidget()
+        self.tree_widget.setHeaderLabels(['Test Cases'])
+        self.resize(600, 400)
+        self.setWindowTitle("Select test cases")
+
+        sections = self.get_debug_sections()
+
+        # add checkboxes tree widget
+        for section, cases in sections.items():
+            parent_item = QTreeWidgetItem(self.tree_widget)
+            parent_item.setText(0, section)
+            parent_item.setFlags(parent_item.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
+
+            for case_name in cases:
+                child_item = QTreeWidgetItem(parent_item)
+                child_item.setText(0, case_name)
+                child_item.setFlags(child_item.flags() | Qt.ItemIsUserCheckable)
+                child_item.setCheckState(0, Qt.Unchecked)
+
+        self.treelayout = QVBoxLayout()
+        self.treelayout.addWidget(self.tree_widget)
+
+        self.buttonlayout = QHBoxLayout()
+        self.reset_button = QPushButton('Reset', self)
+        self.confirm_button = QPushButton('OK', self)
+        self.cancel_button = QPushButton('Cancel', self)
+
+        font = QFont("Yu Gothic UI", 9)
+        self.reset_button.setFont(font)
+        self.confirm_button.setFont(font)
+        self.cancel_button.setFont(font)
+
+        self.reset_button.clicked.connect(self.reset)
+        self.confirm_button.clicked.connect(self.confirm)
+        self.cancel_button.clicked.connect(self.cancel)
+
+        self.buttonlayout.addWidget(self.reset_button)
+        self.buttonlayout.addWidget(self.confirm_button)
+        self.buttonlayout.addWidget(self.cancel_button)
+
+        self.mainlayout = QVBoxLayout()
+        self.mainlayout.addLayout(self.treelayout)
+        self.mainlayout.addLayout(self.buttonlayout)
+        self.setLayout(self.mainlayout)
+
+        # add icon
+        icon = QIcon("./aceinna.ico")
+        self.setWindowIcon(icon)
+
+    def get_debug_sections(self):
+        env = Test_Environment()
+        env.setup_dynamic_tests(self.data_path)
+
+        sections = {}
+        for section in env.test_sections:
+            cases = []
+            for case in section.test_cases:
+                cases.append(case.test_case_name)
+            sections[f'{section.section_name}'] = cases
+        return sections
+
+    def reset(self):
+        iterator = QTreeWidgetItemIterator(self.tree_widget, QTreeWidgetItemIterator.All)
+        while iterator.value():
+            item = iterator.value()
+            item.setCheckState(0, Qt.CheckState.Unchecked)
+            iterator += 1
+
+    def confirm(self):
+        sections = {}
+        for i in range(self.tree_widget.topLevelItemCount()):
+            top_level_item = self.tree_widget.topLevelItem(i)
+            cases = []
+            for j in range(top_level_item.childCount()):
+                child_item = top_level_item.child(j)
+                if child_item.checkState(0) == Qt.Checked:
+                    cases.append(child_item.text(0))
+            if len(cases) != 0:
+                sections[top_level_item.text(0)] = cases
+        self.sections = sections
+        # print(self.sections)
+        self.open_dynamic_test_dialog(True, self.sections)
+
+    def open_dynamic_test_dialog(self, debug, test_dict):
+        self.dynamicD = DynamicDialog(self.data_path, self.result_file_path, debug, test_dict)
+        self.dynamicD.show()
+
+    def cancel(self):
+        self.close()
 
 #--------------------------------------------------------------------------------------------------------------------
 # Attached classes
@@ -525,30 +823,34 @@ class SendProgressBarSignal(QThread):
                 break
 
 class StaticTestStart(QThread):
-    def __init__(self, textBrowser):
+    def __init__(self, textBrowser, debug=False, test_dict=None):
         super(StaticTestStart, self).__init__()
         self.textBrowser = textBrowser
+        self.debug = debug
+        self.test_dict = test_dict
     
     def run(self):
         self.setObjectName("StaticTest")
         self.ver = Verification()
-        self.ver.static_test(text_browser=self.textBrowser)
+        self.ver.static_test(text_browser=self.textBrowser, debug=self.debug, test_dict=self.test_dict)
 
     def stop(self):
         self.quit()
         self.wait()
 
 class DynamicTestStart(QThread):
-    def __init__(self, textBrowser, data_path, result_file_path):
+    def __init__(self, textBrowser, data_path, result_file_path, debug=False, test_dict=None):
         super(DynamicTestStart, self).__init__()
         self.textBrowser = textBrowser
         self.data_path = data_path
         self.result_file_path = result_file_path
+        self.debug = debug
+        self.test_dict = test_dict
     
     def run(self):
         self.setObjectName("DynamicTest")
         self.ver = Verification()
-        self.ver.dynamic_test(self.textBrowser, self.data_path, self.result_file_path)
+        self.ver.dynamic_test(self.textBrowser, self.data_path, self.result_file_path, self.debug, self.test_dict)
 
     def stop(self):
         self.quit()
