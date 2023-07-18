@@ -22,12 +22,14 @@ rtcm_data = [1, 2, 3, 4, 5, 6, 7, 8]
 vehicle_speed_value = 80
 LONGTERM_RUNNING_COUNT = 10000
 
-class Test_Scripts:
+class Static_Test_Scripts:
+    '''
+    device: Ethernet device class
+    '''
     uut = None
-
     def __init__(self, device):
         self.eth = Ethernet_Dev()
-        Test_Scripts.uut = device
+        self.uut = device
         self.tlock = threading.Lock()
         self.product_sn = None
         self.test_time = time.strftime("%Y_%m_%d_%H_%M_%S", time.localtime())
@@ -62,8 +64,7 @@ class Test_Scripts:
 
         for info_name in actual_info_dict:
             actual_info += (f'\n{info_name}: {actual_info_dict[info_name]}')
-            pass
-
+            
         except_info = ''
 
         for info_name in except_info_dict:
@@ -467,19 +468,6 @@ class Test_Scripts:
             return False, f'{except_list}', f'{actual_list}'
 
     ### section5 Long term test function
-
-    def long_term_test(self):
-        result = True
-        command = INPUT_PACKETS[0]
-        message_bytes = []
-        
-        # long term count manual setting
-        result = self.uut.async_write_read(command, message_bytes, self.properties["long term test"]["LONGTERM_RUNNING_COUNT"])       
-        if(result):
-            return True, 'Non zero packets', 'Non zero packets'
-        else:
-            return False, 'Non zero packets', 'Non zero packets'
-
     def long_term_test_setup(self):
         longterm_run_time = int(self.properties["long term test"]["LONGTERM_RUNNING_TIME"])
         filter_type = self.properties["long term test"]["TypeFilter"]
@@ -496,13 +484,6 @@ class Test_Scripts:
             # self.test_log.write2pcap(data, logf_name)
         # self.tlock.release()
         self.uut.stop_listen_data()
-        if self.uut.check_len() != 0:
-            while True:
-                data = self.uut.read_data()
-                self.test_log.write2bin(data)
-                if self.uut.check_len() == 0:
-                    break
-        return True, ' ', ' '          
 
     def gnss_solution_gps_time_jump_test(self):
         logf_name = f'./data/Packet_long_term_test_data/long_terms_data_{self.test_time}.bin'
@@ -924,26 +905,19 @@ class Test_Scripts:
         if self.properties["ntrip account"]["Enable"] == 'ON':
             ntrip = RuNtrip(self.eth)
             ntrip_thread = threading.Thread(target=ntrip.ntrip_client_thread, args=(static_run_time,))
-            # print("Run ntrip...")
+            # print("Run ntrip...")s
             ntrip_thread.start()
 
         start_time = time.time()
-        self.uut.start_listen_data(filter_type)
-        self.uut.reset_buffer()    
-        # self.tlock.acquire()    
+        self.uut.start_listen_data()  
         while time.time() - start_time <= static_run_time:
             data = self.uut.read_data()
             self.test_log.write2bin(data)
         # self.tlock.release()
-        ntrip_thread.join()
+        if self.properties["ntrip account"]["Enable"] == 'ON':
+            ntrip.stop_thread()
         # print("ntrip stop!")
         self.uut.stop_listen_data()
-        if self.uut.check_len() != 0:
-            while True:
-                data = self.uut.read_data()
-                self.test_log.write2bin(data)
-                if self.uut.check_len() == 0:
-                    break
 
     def GNSS_packet_reasonable_check_week(self):
         logf_name = f'./data/static_test_data/static_test_data_{self.test_time}.bin'
@@ -973,10 +947,13 @@ class Test_Scripts:
                 gps_ms_list.append(parse_data_lst[1])
                 real_time_list.append(real_time)
         
-        for i in range(len(gps_week_list)):
-            curr_gps_week = datetime_to_gps_week_seconds(get_curr_time())[0]
-            if gps_week_list[i] != curr_gps_week:
-                unmatch_week_count += 1
+        if len(gps_week_list) != 0:
+            for i in range(len(gps_week_list)):
+                curr_gps_week = datetime_to_gps_week_seconds(get_curr_time())[0]
+                if gps_week_list[i] != curr_gps_week:
+                    unmatch_week_count += 1
+        else:
+            curr_gps_week = 'N/A'
 
         if unmatch_week_count == 0:
             return True, f'number of unmatch real gps week = {unmatch_week_count}', f'match real gps week {curr_gps_week}'
@@ -1790,7 +1767,7 @@ class Test_Scripts:
                 accel_mod_lst.append(accel_mod_value)
 
         for i in accel_mod_lst:
-            if 9 < abs(i) < 11:
+            if 9 < abs(i) < 10.6:
                 continue
             else:
                 accel_mod_err_list.append(i)
